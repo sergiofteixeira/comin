@@ -28,11 +28,13 @@ func RepositoryClone(directory, url, commitId, accessToken string) error {
 	}
 	repository, err := git.PlainClone(directory, false, options)
 	if err != nil {
-		return err
+		// return err
+		return fmt.Errorf("Cannot clone the repository: %s", err)
 	}
 	worktree, err := repository.Worktree()
 	if err != nil {
-		return err
+		// return err
+		return fmt.Errorf("worktree Error: %s", err)
 	}
 	err = worktree.Checkout(&git.CheckoutOptions{
 		Hash: plumbing.NewHash(commitId),
@@ -138,6 +140,7 @@ func fetch(r repository, remote types.Remote) (err error) {
 		return nil
 	} else if err != git.NoErrAlreadyUpToDate {
 		logrus.Errorf("Pull from remote '%s' failed: %s", remote.Name, err)
+		logrus.Error("fails in NoErrrAlreadyUpToDate")
 		return fmt.Errorf("'git fetch %s' fails: '%s'", remote.Name, err)
 	} else {
 		logrus.Debugf("No new commits have been fetched from the remote '%s'", remote.Name)
