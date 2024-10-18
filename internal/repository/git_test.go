@@ -1,47 +1,46 @@
-// package repository
+package repository
 
-//import (
-//"github.com/go-git/go-git/v5"
-//"github.com/go-git/go-git/v5/plumbing"
-//"github.com/go-git/go-git/v5/plumbing/object"
-//"github.com/stretchr/testify/assert"
-//"io/ioutil"
-//"path/filepath"
-//"testing"
-//"time"
-//)
+import (
+	"io/ioutil"
+	"path/filepath"
+	"time"
 
-//func commitFile(remoteRepository *git.Repository, dir, branch, content string) (commitId string, err error) {
-//w, err := remoteRepository.Worktree()
-//if err != nil {
-//return
-//}
-//err = w.Checkout(&git.CheckoutOptions{
-//Branch: plumbing.NewBranchReferenceName(branch),
-//Force:  true,
-//})
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+)
 
-//filename := filepath.Join(dir, content)
-//err = ioutil.WriteFile(filename, []byte(content), 0644)
-//if err != nil {
-//return
-//}
-//_, err = w.Add(content)
-//if err != nil {
-//return
-//}
-//hash, err := w.Commit(content, &git.CommitOptions{
-//Author: &object.Signature{
-//Name:  "John Doe",
-//Email: "john@doe.org",
-//When:  time.Unix(0, 0),
-//},
-//})
-//if err != nil {
-//return
-//}
-//return hash.String(), nil
-//}
+func commitFile(remoteRepository *git.Repository, dir, branch, content string) (commitId string, err error) {
+	w, err := remoteRepository.Worktree()
+	if err != nil {
+		return
+	}
+	err = w.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(branch),
+		Force:  true,
+	})
+
+	filename := filepath.Join(dir, content)
+	err = ioutil.WriteFile(filename, []byte(content), 0644)
+	if err != nil {
+		return
+	}
+	_, err = w.Add(content)
+	if err != nil {
+		return
+	}
+	hash, err := w.Commit(content, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "John Doe",
+			Email: "john@doe.org",
+			When:  time.Unix(0, 0),
+		},
+	})
+	if err != nil {
+		return
+	}
+	return hash.String(), nil
+}
 
 //func initRemoteRepostiory(dir string, initTesting bool) (remoteRepository *git.Repository, err error) {
 //remoteRepository, err = git.PlainInit(dir, false)
@@ -117,5 +116,5 @@
 // ret, _ = isAncestor(repository, commits[2].Hash, commits[0].Hash)
 // assert.True(t, ret)
 
-////time.Sleep(100*time.Second)
+//// time.Sleep(100*time.Second)
 //}

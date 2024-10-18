@@ -1,40 +1,39 @@
-// package repository
+package repository
 
-//import (
-//"testing"
+import (
+	"testing"
 
-//"github.com/go-git/go-git/v5/plumbing"
-//"github.com/nlewo/comin/internal/types"
-//"github.com/stretchr/testify/assert"
-//)
+	"github.com/nlewo/comin/internal/types"
+	"github.com/stretchr/testify/assert"
+)
 
-//func TestNew(t *testing.T) {
-//var err error
-//r1Dir := t.TempDir()
-//cominRepositoryDir := t.TempDir()
-//_, err = initRemoteRepostiory(r1Dir, true)
-//gitConfig := types.GitConfig{
-//Path: cominRepositoryDir,
-//Remotes: []types.Remote{
-//{
-//Name: "r1",
-//URL:  r1Dir,
-//Branches: types.Branches{
-//Main: types.Branch{
-//Name: "main",
-//},
-//Testing: types.Branch{
-//Name: "testing",
-//},
-//},
-//Timeout: 30,
-//},
-//},
-//}
-//r, err := New(gitConfig, "")
-//assert.Nil(t, err)
-//assert.Equal(t, "r1", r.RepositoryStatus.Remotes[0].Name)
-//}
+func TestNew(t *testing.T) {
+	var err error
+	r1Dir := t.TempDir()
+	cominRepositoryDir := t.TempDir()
+	_, err = initRemoteRepostiory(r1Dir, true)
+	gitConfig := types.GitConfig{
+		Path: cominRepositoryDir,
+		Remotes: []types.Remote{
+			{
+				Name: "r1",
+				URL:  r1Dir,
+				Branches: types.Branches{
+					Main: types.Branch{
+						Name: "main",
+					},
+					Testing: types.Branch{
+						Name: "testing",
+					},
+				},
+				Timeout: 30,
+			},
+		},
+	}
+	r, err := New(gitConfig, "")
+	assert.Nil(t, err)
+	assert.Equal(t, "r1", r.RepositoryStatus.Remotes[0].Name)
+}
 
 //func TestPreferMain(t *testing.T) {
 //var err error
@@ -100,7 +99,7 @@
 //gitConfig := types.GitConfig{
 //Path: cominRepositoryDir,
 //Remotes: []types.Remote{
-//types.Remote{
+//{
 //Name: "r1",
 //URL:  r1Dir,
 //Branches: types.Branches{
@@ -140,7 +139,7 @@
 //gitConfig := types.GitConfig{
 //Path: cominRepositoryDir,
 //Remotes: []types.Remote{
-//types.Remote{
+//{
 //Name: "r1",
 //URL:  r1Dir,
 //Branches: types.Branches{
@@ -153,7 +152,7 @@
 //},
 //Timeout: 30,
 //},
-//types.Remote{
+//{
 //Name: "r2",
 //URL:  r2Dir,
 //Branches: types.Branches{
@@ -208,7 +207,7 @@
 //gitConfig := types.GitConfig{
 //Path: cominRepositoryDir,
 //Remotes: []types.Remote{
-//types.Remote{
+//{
 //Name: "r1",
 //URL:  r1Dir,
 //Branches: types.Branches{
@@ -221,7 +220,7 @@
 //},
 //Timeout: 30,
 //},
-//types.Remote{
+//{
 //Name: "r2",
 //URL:  r2Dir,
 //Branches: types.Branches{
@@ -350,7 +349,7 @@
 //gitConfig := types.GitConfig{
 //Path: cominRepositoryDir,
 //Remotes: []types.Remote{
-//types.Remote{
+//{
 //Name: "r1",
 //URL:  r1Dir,
 //Branches: types.Branches{
@@ -363,7 +362,7 @@
 //},
 //Timeout: 30,
 //},
-//types.Remote{
+//{
 //Name: "r2",
 //URL:  r2Dir,
 //Branches: types.Branches{
@@ -432,7 +431,7 @@
 //gitConfig := types.GitConfig{
 //Path: cominRepositoryDir,
 //Remotes: []types.Remote{
-//types.Remote{
+//{
 //Name: "r1",
 //URL:  r1Dir,
 //Branches: types.Branches{
@@ -465,7 +464,7 @@
 //gitConfig := types.GitConfig{
 //Path: cominRepositoryDir,
 //Remotes: []types.Remote{
-//types.Remote{
+//{
 //Name: "origin",
 //URL:  remoteRepositoryDir,
 //Branches: types.Branches{
@@ -524,7 +523,7 @@
 //gitConfig := types.GitConfig{
 //Path: cominRepositoryDir,
 //Remotes: []types.Remote{
-//types.Remote{
+//{
 //Name: "origin",
 //URL:  remoteRepositoryDir,
 //Branches: types.Branches{
@@ -583,7 +582,7 @@
 //gitConfig := types.GitConfig{
 //Path: cominRepositoryDir,
 //Remotes: []types.Remote{
-//types.Remote{
+//{
 //Name: "origin",
 //URL:  remoteRepositoryDir,
 //Branches: types.Branches{
