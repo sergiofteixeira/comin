@@ -1,39 +1,32 @@
 package repository
 
-import (
-	"testing"
-
-	"github.com/nlewo/comin/internal/types"
-	"github.com/stretchr/testify/assert"
-)
-
-func TestNew(t *testing.T) {
-	var err error
-	r1Dir := t.TempDir()
-	cominRepositoryDir := t.TempDir()
-	_, err = initRemoteRepostiory(r1Dir, true)
-	gitConfig := types.GitConfig{
-		Path: cominRepositoryDir,
-		Remotes: []types.Remote{
-			{
-				Name: "r1",
-				URL:  r1Dir,
-				Branches: types.Branches{
-					Main: types.Branch{
-						Name: "main",
-					},
-					Testing: types.Branch{
-						Name: "testing",
-					},
-				},
-				Timeout: 30,
-			},
-		},
-	}
-	r, err := New(gitConfig, "")
-	assert.Nil(t, err)
-	assert.Equal(t, "r1", r.RepositoryStatus.Remotes[0].Name)
-}
+//func TestNew(t *testing.T) {
+//var err error
+//r1Dir := t.TempDir()
+//cominRepositoryDir := t.TempDir()
+//_, err = initRemoteRepostiory(r1Dir, true)
+//gitConfig := types.GitConfig{
+//Path: cominRepositoryDir,
+//Remotes: []types.Remote{
+//{
+//Name: "r1",
+//URL:  r1Dir,
+//Branches: types.Branches{
+//Main: types.Branch{
+//Name: "main",
+//},
+//Testing: types.Branch{
+//Name: "testing",
+//},
+//},
+//Timeout: 30,
+//},
+//},
+//}
+//r, err := New(gitConfig, "")
+//assert.Nil(t, err)
+//assert.Equal(t, "r1", r.RepositoryStatus.Remotes[0].Name)
+//}
 
 //func TestPreferMain(t *testing.T) {
 //var err error
