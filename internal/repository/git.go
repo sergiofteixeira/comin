@@ -115,36 +115,44 @@ func hardReset(r repository, newHead plumbing.Hash) error {
 }
 
 // fetch fetches the config.Remote
-func fetch(r repository, remote types.Remote) (err error) {
+func fetch(r repository, remote types.Remote) error {
 	logrus.Debugf("Fetching remote '%s'", remote.Name)
+	logrus.Debugf("Starting fetch for remote configuration: %+v", remote)
+	logrus.Debugf("Remote URL: %s", remote.URL)
+	logrus.Debugf("Remote Name: %s", remote.Name)
+	logrus.Debugf("Auth Config Present: %v", remote.Auth.AccessToken != "")
 	fetchOptions := git.FetchOptions{
 		RemoteName: remote.Name,
 	}
-	// TODO: support several authentication methods
+
+	// Ensure auth token is properly set
 	if remote.Auth.AccessToken != "" {
+		logrus.Debugf("Setting up authentication for remote '%s'", remote.Name)
 		fetchOptions.Auth = &http.BasicAuth{
-			// On GitLab, any non blank username is
-			// working.
-			Username: "comin",
+			Username: "comin", // Or use a configured username
 			Password: remote.Auth.AccessToken,
 		}
+	} else {
+		logrus.Printf("No access token provided for remote '%s', authentication might fail", remote.Name)
 	}
 
-	// TODO: we should get a parent context
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remote.Timeout)*time.Second)
 	defer cancel()
-	// TODO: we should only fetch tracked branches
-	err = r.Repository.FetchContext(ctx, &fetchOptions)
-	if err == nil {
+
+	err := r.Repository.FetchContext(ctx, &fetchOptions)
+
+	// Better error handling
+	switch {
+	case err == nil:
 		logrus.Infof("New commits have been fetched from '%s'", remote.URL)
 		return nil
-	} else if err != git.NoErrAlreadyUpToDate {
-		logrus.Errorf("Pull from remote '%s' failed: %s", remote.Name, err)
-		logrus.Error("fails in NoErrrAlreadyUpToDate")
-		return fmt.Errorf("'git fetch %s' fails: '%s'", remote.Name, err)
-	} else {
+	case err == git.NoErrAlreadyUpToDate:
 		logrus.Debugf("No new commits have been fetched from the remote '%s'", remote.Name)
 		return nil
+	case err.Error() == "authentication required":
+		return fmt.Errorf("Authentication failed for remote '%s'. Please verify your access token", remote.Name)
+	default:
+		return fmt.Errorf("git fetch %s failed: %v", remote.Name, err)
 	}
 }
 
