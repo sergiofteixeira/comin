@@ -47,16 +47,27 @@ func RepositoryClone(directory, url, commitId, accessToken string) error {
 
 func getRemoteCommitHash(r repository, remote, branch string) *plumbing.Hash {
 	remoteBranch := fmt.Sprintf("refs/remotes/%s/%s", remote, branch)
+	logrus.Debugf("Looking for remote branch: %s", remoteBranch)
+
 	remoteHeadRef, err := r.Repository.Reference(
 		plumbing.ReferenceName(remoteBranch),
 		true)
 	if err != nil {
+		logrus.Debugf("Failed to find reference for %s: %v", remoteBranch, err)
 		return nil
 	}
 	if remoteHeadRef == nil {
+		logrus.Debugf("No reference found for %s", remoteBranch)
 		return nil
 	}
+
 	commitId := remoteHeadRef.Hash()
+	if commitId.IsZero() {
+		logrus.Debug("Found zero hash for remote branch")
+		return nil
+	}
+
+	logrus.Debugf("Found commit hash %s for remote branch %s", commitId.String(), remoteBranch)
 	return &commitId
 }
 
@@ -99,41 +110,70 @@ func getHeadFromRemoteAndBranch(r repository, remoteName, branchName, currentMai
 }
 
 func hardReset(r repository, newHead plumbing.Hash) error {
-	var w *git.Worktree
+	// Validate hash before attempting reset
+	if newHead.IsZero() {
+		return fmt.Errorf("cannot reset to zero hash, no valid commit selected")
+	}
+
 	w, err := r.Repository.Worktree()
 	if err != nil {
-		return fmt.Errorf("Failed to get the worktree")
+		return fmt.Errorf("failed to get worktree: %w", err)
 	}
+
+	// First verify the commit exists
+	_, err = r.Repository.CommitObject(newHead)
+	if err != nil {
+		return fmt.Errorf("commit %s not found in repository: %w", newHead.String(), err)
+	}
+
 	err = w.Checkout(&git.CheckoutOptions{
 		Hash:  newHead,
 		Force: true,
 	})
 	if err != nil {
-		return fmt.Errorf("git reset --hard %s fails: '%s'", newHead, err)
+		return fmt.Errorf("git reset --hard %s failed: %w", newHead.String(), err)
 	}
+
+	logrus.Debugf("Successfully reset to commit %s", newHead.String())
 	return nil
+}
+
+func isValidCommitHash(hash string) bool {
+	if len(hash) != 40 {
+		return false
+	}
+	// Check if string is valid hex
+	for _, c := range hash {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 // fetch fetches the config.Remote
 func fetch(r repository, remote types.Remote) error {
-	logrus.Debugf("Fetching remote '%s'", remote.Name)
-	logrus.Debugf("Starting fetch for remote configuration: %+v", remote)
-	logrus.Debugf("Remote URL: %s", remote.URL)
-	logrus.Debugf("Remote Name: %s", remote.Name)
-	logrus.Debugf("Auth Config Present: %v", remote.Auth.AccessToken != "")
-	fetchOptions := git.FetchOptions{
-		RemoteName: remote.Name,
+	logrus.Debugf("Starting fetch for remote '%s' (URL: %s)", remote.Name, remote.URL)
+
+	// Validate remote configuration
+	if remote.URL == "" {
+		return fmt.Errorf("empty URL for remote '%s'", remote.Name)
 	}
 
-	// Ensure auth token is properly set
+	fetchOptions := git.FetchOptions{
+		RemoteName: remote.Name,
+		Force:      true, // Add force option to ensure we get updates
+		RefSpecs:   []gitConfig.RefSpec{"+refs/heads/*:refs/remotes/origin/*"},
+	}
+
 	if remote.Auth.AccessToken != "" {
-		logrus.Debugf("Setting up authentication for remote '%s'", remote.Name)
+		logrus.Debugf("Using authentication for remote '%s'", remote.Name)
 		fetchOptions.Auth = &http.BasicAuth{
-			Username: "comin", // Or use a configured username
+			Username: "comin",
 			Password: remote.Auth.AccessToken,
 		}
 	} else {
-		logrus.Printf("No access token provided for remote '%s', authentication might fail", remote.Name)
+		logrus.Debugf("No access token provided for remote '%s'", remote.Name)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remote.Timeout)*time.Second)
@@ -141,18 +181,19 @@ func fetch(r repository, remote types.Remote) error {
 
 	err := r.Repository.FetchContext(ctx, &fetchOptions)
 
-	// Better error handling
 	switch {
 	case err == nil:
-		logrus.Infof("New commits have been fetched from '%s'", remote.URL)
+		logrus.Infof("Successfully fetched from remote '%s'", remote.Name)
 		return nil
 	case err == git.NoErrAlreadyUpToDate:
-		logrus.Debugf("No new commits have been fetched from the remote '%s'", remote.Name)
+		logrus.Debugf("Remote '%s' is already up to date", remote.Name)
 		return nil
-	case err.Error() == "authentication required":
-		return fmt.Errorf("Authentication failed for remote '%s'. Please verify your access token", remote.Name)
+	case err != nil && err.Error() == "authentication required":
+		logrus.Errorf("Authentication failed for remote '%s'. Token provided: %v",
+			remote.Name, remote.Auth.AccessToken != "")
+		return fmt.Errorf("authentication failed for remote '%s': verify access token", remote.Name)
 	default:
-		return fmt.Errorf("git fetch %s failed: %v", remote.Name, err)
+		return fmt.Errorf("fetch from '%s' failed: %w", remote.Name, err)
 	}
 }
 
