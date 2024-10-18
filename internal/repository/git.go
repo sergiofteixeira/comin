@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	stdhttp "net/http"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -162,15 +164,25 @@ func fetch(r repository, remote types.Remote) error {
 
 	fetchOptions := git.FetchOptions{
 		RemoteName: remote.Name,
-		Force:      true, // Add force option to ensure we get updates
+		Force:      true,
 		RefSpecs:   []gitConfig.RefSpec{"+refs/heads/*:refs/remotes/origin/*"},
+		Progress:   nil,
+		Tags:       git.AllTags,
 	}
 
 	if remote.Auth.AccessToken != "" {
-		logrus.Debugf("Using authentication for remote '%s'", remote.Name)
+		logrus.Debugf("Configuring GitHub authentication for remote '%s'", remote.Name)
+		// For GitHub, the token should be used as the password with 'oauth2' as username
 		fetchOptions.Auth = &http.BasicAuth{
-			Username: "comin",
+			Username: "oauth2", // Changed from "comin" to "oauth2" for GitHub
 			Password: remote.Auth.AccessToken,
+		}
+
+		// Add debug information about token format
+		tokenLength := len(remote.Auth.AccessToken)
+		if tokenLength > 0 {
+			logrus.Debugf("Token length: %d characters", tokenLength)
+			logrus.Debugf("Token prefix (first 4 chars): %s", remote.Auth.AccessToken[:4])
 		}
 	} else {
 		logrus.Debugf("No access token provided for remote '%s'", remote.Name)
@@ -189,12 +201,36 @@ func fetch(r repository, remote types.Remote) error {
 		logrus.Debugf("Remote '%s' is already up to date", remote.Name)
 		return nil
 	case err != nil && err.Error() == "authentication required":
-		logrus.Errorf("Authentication failed for remote '%s'. Token provided: %v",
-			remote.Name, remote.Auth.AccessToken != "")
-		return fmt.Errorf("authentication failed for remote '%s': verify access token", remote.Name)
+		details := fmt.Sprintf("URL: %s, Token Present: %v, Token Length: %d",
+			remote.URL, remote.Auth.AccessToken != "", len(remote.Auth.AccessToken))
+		logrus.Errorf("GitHub authentication failed. Details: %s", details)
+		return fmt.Errorf("GitHub authentication failed for remote '%s'. Please verify: \n"+
+			"1. Token is a valid GitHub Personal Access Token\n"+
+			"2. Token has 'repo' scope permissions\n"+
+			"3. Token is not expired", remote.Name)
+	case err != nil && strings.Contains(err.Error(), "403"):
+		logrus.Errorf("GitHub API rate limit or permission issue: %v", err)
+		return fmt.Errorf("GitHub access denied (403) for remote '%s'. Check token permissions", remote.Name)
 	default:
+		logrus.Errorf("Fetch error: %v", err)
 		return fmt.Errorf("fetch from '%s' failed: %w", remote.Name, err)
 	}
+}
+
+// Add this helper function to validate GitHub token format
+func validateGitHubToken(token string) error {
+	if len(token) != 40 { // GitHub tokens are typically 40 characters
+		return fmt.Errorf("invalid token length: expected 40 characters, got %d", len(token))
+	}
+
+	// GitHub tokens are typically hexadecimal
+	for _, c := range token {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return fmt.Errorf("token contains invalid characters (should be hexadecimal)")
+		}
+	}
+
+	return nil
 }
 
 // isAncestor returns true when the commitId is an ancestor of the branch branchName
@@ -301,4 +337,54 @@ func verifyHead(r *git.Repository, config types.GitConfig) error {
 
 	}
 	return fmt.Errorf("Commit %s is not signed", head.Hash())
+}
+
+func checkGitHubAccess(remote types.Remote) error {
+	if !strings.Contains(remote.URL, "github.com") {
+		return nil
+	}
+
+	if err := validateGitHubToken(remote.Auth.AccessToken); err != nil {
+		return fmt.Errorf("invalid token format: %w", err)
+	}
+
+	urlParts := strings.Split(strings.TrimSuffix(remote.URL, ".git"), "/")
+	if len(urlParts) < 2 {
+		return fmt.Errorf("invalid GitHub URL format")
+	}
+
+	owner := urlParts[len(urlParts)-2]
+	repo := urlParts[len(urlParts)-1]
+
+	client := &stdhttp.Client{Timeout: time.Second * 10} // using stdhttp.Client
+	req, err := stdhttp.NewRequest(stdhttp.MethodGet,    // using stdhttp.NewRequest
+		fmt.Sprintf("https://api.github.com/repos/%s/%s", owner, repo),
+		nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if remote.Auth.AccessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+remote.Auth.AccessToken)
+		req.Header.Set("Accept", "application/vnd.github.v3+json")
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case stdhttp.StatusOK: // using stdhttp.StatusOK
+		return nil
+	case stdhttp.StatusUnauthorized: // using stdhttp.StatusUnauthorized
+		return fmt.Errorf("unauthorized: invalid token")
+	case stdhttp.StatusForbidden: // using stdhttp.StatusForbidden
+		return fmt.Errorf("forbidden: token lacks required permissions")
+	case stdhttp.StatusNotFound: // using stdhttp.StatusNotFound
+		return fmt.Errorf("repository not found or no access")
+	default:
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
